@@ -15,6 +15,12 @@ class Node:
         """
         Node representing a node in a `StructureGraph`. Each node has an index, which is a tuple of
         (layer index, node index), e.g., (li, ni) means the ni-th node in the li-th layer.
+
+        Parameters:
+        ------------
+        parent_nodes: the parent nodes that it depends on, e.g., if there are school backpacks in the \
+            art classroom, then school backpack is one of the parent nodes of the art classroom.
+        index: the index of the node, which is a tuple of (layer index, node index).        name: the name of the node, i.e., "school backpack" or "art classroom".
         """
         self.parent_nodes = parent_nodes
         self.index = index
@@ -25,6 +31,18 @@ class Node:
         return len(self.parent_nodes)
 
 class Parameter(Node):
+    """
+    Parameter representing a parameter derived from a `StructureGraph`. There are two types of parameters:
+    - instance parameter: defined by each edge, e.g., the edge `((li, ni), (lj, nj))` defines a parameter
+        which means "the number of `nodes[li][ni].name` in each `nodes[lj][nj].name`", represented as 
+        `((li, ni), (lj, nj))`.
+    - abstract parameter: not explicitly defined by the graph, but it is the parameter describing
+        the total number of items in one category w.r.t. a node in a higher layer. E.g., one abstract
+        parameter is "the total number of [Category of layer li] in each `nodes[lj][nj].name`",
+        represented as `(li, (lj, nj))`.
+    
+    See the `StructureGraph` class for more details.
+    """
     def __init__(
         self, 
         parent_nodes: List["Parameter"], 
@@ -32,17 +50,6 @@ class Parameter(Node):
         name: str,
     ):
         """
-        Parameter representing a parameter derived from a `StructureGraph`. There are two types of parameters:
-        - instance parameter: defined by each edge, e.g., the edge `((li, ni), (lj, nj))` defines a parameter
-            which means "the number of `nodes[li][ni].name` in each `nodes[lj][nj].name`", represented as 
-            `((li, ni), (lj, nj))`.
-        - abstract parameter: not explicitly defined by the graph, but it is the parameter describing
-            the total number of items in one category w.r.t. a node in a higher layer. E.g., one abstract
-            parameter is "the total number of [Category of layer li] in each `nodes[lj][nj].name`",
-            represented as `(li, (lj, nj))`.
-        
-        See the `StructureGraph` class for more details.
-
         Parameters:
         ------------
         parent_nodes: the parent parameters that it depends on.
@@ -53,12 +60,10 @@ class Parameter(Node):
         self.parent_nodes = parent_nodes
         self.index = index
         self.name = name
-        
-        self.d_level = 0 if self.param_type == "instance" else index[1][0] - index[0]
     
     @property
     def param_type(self) -> Literal["instance", "abstract"]:
-        return "instance" if isinstance(self.index[0], int) else "abstract"
+        return "abstract" if isinstance(self.index[0], int) else "instance"
     
     @property
     def d_level(self) -> int:
@@ -68,6 +73,10 @@ class Parameter(Node):
         return self.index[1][0] - self.index[0] if self.param_type == "abstract" else -1
 
 class DependencyNode(Node):
+    """
+    DependencyNode representing a node in a `DependencyGraph`. Each node corresponds to a parameter from
+    the `StructureGraph`. 
+    """
     def __init__(
         self,
         parent_nodes: List["DependencyNode"],
@@ -77,13 +86,11 @@ class DependencyNode(Node):
         value: int = 0,
     ):
         """
-        DependencyNode representing a node in a `DependencyGraph`. Each node corresponds to a parameter from
-        the `StructureGraph`.
-
         Parameters:
         ------------
         parent_nodes: the parent nodes that it depends on.
-        node_type: the type of the node, either "instance" or "abstract", corresponding to the parameter type.
+        node_type: the type of the node, either "instance", "abstract" or "rng" (random number generator), corresponding \
+            to the parameter type.
         eval_equation: the equation that the node performs from parent nodes, e.g., f"{parent[0].value}+{parent[1].value}".
         name: the name of the node.
         value: the correct value of the node by performing the equation from parent nodes.
@@ -99,7 +106,7 @@ class DependencyNode(Node):
         Get the operation that the node performs from parent nodes.
         """
         if self.node_type == "abstract":
-            if self.parent_nodes[1].node_type == "abstract": 
+            if len(self.parent_nodes) > 1 and self.parent_nodes[1].node_type == "abstract": 
                 # difficult level >= 2, should be {0} * {1} + {2} * {3} + ...
                 # then we will get the value by `eval(eval_equation.format(*[p.value for p in self.parent_nodes]))`
                 self.eval_equation = "+".join([f"{{{i}}}*{{{i+1}}}" for i in range(0, len(self.parent_nodes), 2)])
@@ -112,14 +119,21 @@ class DependencyNode(Node):
 
 
 class StructureGraph:
+    """
+    StuctureGraph representing the structure (a DAG) of the variables of a system (e.g., the fig 1 left
+    in the paper), where the problem is built on:
+    - The nodes in the graph are the variables, e.g., school backpack, art classroom, etc.
+    - The edges are the dependencies, indicating the relationship between the variables.
+
+    Based on the structure graph, we can get parameters (e.g., each art classroom's school backpack) and
+    construct the dependency graph, which is the graph leading to the final problem.
+    """
     def __init__(
         self, 
-        # nodes: List[List[int]],
-        # edges: List[Tuple[Tuple[int, int], Tuple[int, int]]],
         w0: int, 
         w1: int, 
-        n_layer: int, 
-        n_edge: int,
+        num_layers: int, 
+        num_edges: int,
         name_dictionary: List[List[str]],
         layer_category_name: List[str],
     ):
@@ -128,17 +142,18 @@ class StructureGraph:
         ------------
         w0: int, the minimum number of items per layer
         w1: int, the maximum number of items per layer
-        n_layer: int, the number of layers
-        n_edge: int, the number of edges
+        num_layers: int, the number of layers
+        num_edges: int, the number of edges
         names: list of names for each layer
         layer_category_name: list of category name for each layer
         """
         
-        assert n_layer == len(name_dictionary) == len(layer_category_name), "Number of layers and names do not match"
+        assert num_layers == len(name_dictionary) == len(layer_category_name), \
+            f"Number of layers and names do not match: {num_layers}, {len(name_dictionary)}, {len(layer_category_name)}"
         self.w0 = w0
         self.w1 = w1
-        self.num_layers = n_layer
-        self.num_edges = n_edge
+        self.num_layers = num_layers
+        self.num_edges = num_edges
 
         self.layer_category_name = layer_category_name
 
@@ -151,41 +166,43 @@ class StructureGraph:
         """
         Algorithm 1 in the paper. Randomly draw the structure of the graph.
         """
-        w0, w1, n_layer, n_edge = self.w0, self.w1, self.num_layers, self.num_edges
+        w0, w1, num_layers, num_edges = self.w0, self.w1, self.num_layers, self.num_edges
         
+        max_attempts = 10
+
         # 1. Randomly generate the number of items per layer
         flag = False
         _cnt = 0
         while not flag:
             _cnt += 1
-            n_items_per_layer = [random.randint(w0, w1) for _ in range(n_layer)]
+            n_items_per_layer = [random.randint(w0, w1) for _ in range(num_layers)]
             e_minus = sum(n_items_per_layer[1:])
-            e_plus = sum(n_items_per_layer[i]*n_items_per_layer[i+1] for i in range(n_layer-1))
-            if e_minus <= n_edge <= e_plus or _cnt > self.config["max_attempts"]:
+            e_plus = sum(n_items_per_layer[i]*n_items_per_layer[i+1] for i in range(num_layers-1))
+            if e_minus <= num_edges <= e_plus or _cnt > max_attempts:
                 flag = True
-        if _cnt > self.config["max_attempts"]:
-            return None
+        if _cnt > max_attempts:
+            raise RuntimeError("Cannot generate the structure graph.")
         
         # 2. Randomly generate the nodes and edges
         # list of nodes in each layer, looking like [[x0,x1,x2], [y0,y1,y2,y3], ...]
         # then we can get the node by self.nodes[li][ni]
         self.nodes: List[List[Node]] = [] 
         for i, n_item in enumerate(n_items_per_layer):
-            self.nodes.append([Node(index=[i,j]) for j in range(n_item)])
+            self.nodes.append([Node(index=(i,j), parent_nodes=[]) for j in range(n_item)])
         
         # 2.1 generate minimum number (e_minus) of edges
         # each edge is represented as ((li, ni), (lj, nj))
         # where li, lj are the layer index and ni, nj are the node index
         self.edges: List[Tuple[Tuple[int, int], Tuple[int, int]]] = []
-        for i in range(1, n_layer):
+        for i in range(1, num_layers):
             for j in range(n_items_per_layer[i]):
                 k = random.randint(0, n_items_per_layer[i-1]-1)
                 self.edges.append(((i-1, k), (i, j)))
         
         # 2.2 generate the remaining edges
         n_current_edges = len(self.edges)
-        while n_current_edges < n_edge:
-            i = random.randint(1, n_layer-1)
+        while n_current_edges < num_edges:
+            i = random.randint(1, num_layers-1)
             j = random.randint(0, n_items_per_layer[i]-1)
             k = random.randint(0, n_items_per_layer[i-1]-1)
             if ((i-1, k), (i, j)) not in self.edges:
@@ -278,6 +295,13 @@ class StructureGraph:
     
 
 class DependencyGraph:
+    """
+    DependencyGraph representing the dependency graph of the parameters from the `StructureGraph`, corresponding 
+    to fig 1 right in the paper. We will then generate the problem based on the dependency graph.
+    - The nodes in the graph are the parameters, e.g., "each art classroom's school backpack".
+    - The edges are the dependencies, e.g., "each art classroom's school backpack" depends on "each film studio's \
+        messenger backpack" by "each art classroom's school backpack" = "each film studio's messenger backpack" * 2.
+    """
     def __init__(
         self, 
         Gs: StructureGraph, 
@@ -287,6 +311,16 @@ class DependencyGraph:
         max_instance_in_degree: int = 4,
         mod = 23,
     ):
+        """
+        Parameters:
+        ------------
+        Gs: the structure graph
+        max_op_stage1: the maximum number of operations in the first stage
+        max_op_stage2: the maximum number of operations in the second stage
+        final_num_op: the final number of operations desired
+        max_instance_in_degree: the maximum in-degree of instance nodes
+        mod: the mod number during the computation
+        """
         self.Gs = Gs
 
         self.max_op_stage1 = max_op_stage1
@@ -295,21 +329,19 @@ class DependencyGraph:
         self.max_instance_in_degree = max_instance_in_degree
         self.mod = mod
         
-        self.num_op = 0
+        self.num_op = 0 # the current number of operations
 
         self.rng = DependencyNode([], "rng", name="RNG", value=0)
+        self.topo: List[DependencyNode] = []
 
-        # TODO: add after constructing the graph
-        self.leave_nodes = [node for layer in self.Gs.nodes for node in layer if node.in_degree == 0]
-        self.root_nodes = None
-
-    def construct_dependency_graph(self):
+    def construct_dependency_graph(self) -> bool:
         """
         Construct the dependency graph of the structure graph.
-        """
-        # self.nodes = []
-        # self.edges = []
 
+        Return:
+        -------
+        bool: whether the graph is successfully constructed
+        """
         # This dictionary will map from a Parameter to its corresponding DependencyNode.
         self.param2depnode: Dict[Parameter, DependencyNode] = {}
         # We will get all DependencyNodes in first 2 stages.
@@ -317,12 +349,12 @@ class DependencyGraph:
         self.construct_Gd2()
         self.depnodes = list(self.param2depnode.values())
 
-        self.topo = self.construct_Gd3()
-        if not self.topo:
+        if not self.construct_Gd3():
             return False
-        if not self.construct_Gd4(self.topo):
+        if not self.construct_Gd4():
             return False
         self.construct_Gd()
+        return True
 
 
 
@@ -366,6 +398,7 @@ class DependencyGraph:
         
         # if not reached, add the new DependencyNodes to the graph
         self.num_op += new_op
+        self.param2depnode.update(tmp_param2depnode)
         # Second pass: 
         # Now that the new DependencyNodes are created, link them together.
         for param, dep_node in tmp_param2depnode.items():
@@ -373,14 +406,14 @@ class DependencyGraph:
             if dep_node.node_type == "abstract":
                 dep_node.get_equation()
         
-        self.param2depnode.update(tmp_param2depnode)
         return True
     
     def construct_Gd1(self):
         """
         Stage 1 of the dependency graph construction:
+
         Randomly select abstract parameters and its all dependent instance/abstract parameters
-        recursively until the number of operations reaches max_op_stage1.
+        recursively until the number of operations reaches `max_op_stage1`.
         """
         flag = True
         while flag:
@@ -399,7 +432,8 @@ class DependencyGraph:
     def construct_Gd2(self):
         """
         Stage 2 of the dependency graph construction:
-        Randomly select instance parameters until the number of operations reaches max_op_stage2.
+
+        Randomly select instance parameters until the number of operations reaches `max_op_stage2`.
         """
         remaining_instance_params = set([p for p in self.Gs.params if p.param_type == "instance" and p not in self.param2depnode])
         while self.num_op < self.max_op_stage2 and remaining_instance_params:
@@ -414,28 +448,30 @@ class DependencyGraph:
             self.num_op += max(1, selected_param.in_degree - 1)
 
 
-    def construct_Gd3(self) -> List[DependencyNode]:
+    def construct_Gd3(self) -> bool:
         """
         Stage 3 of the dependency graph construction:
+
         Get a random topological order of the nodes in the graph.
         
         Return:
         -------
-        List[DependencyNode]: the list of DependencyNodes in topological order, empty list if failed
+        bool: whether the graph is successfully constructed
         """
+        # here we only compute the out degree to the remaining nodes
+        # i.e., exclude the degree to topo
         out_degree_map = {node: 0 for node in self.depnodes}
         for node in self.depnodes:
             for parent in node.parent_nodes:
                 out_degree_map[parent] += 1
-
-        remaining_nodes = set(self.depnodes)
         
         # start from the leave nodes
         # topo: the list of DependencyNodes in topological order 
         # (first it is from leaves to roots, will be reversed later)
         # group1: the parent nodes of nodes in topo, corresponding to Next1_Gd in paper
-        # group2: the nodes having no children in remaining_nodes, corresponding to Next2_Gd in paper
-        topo = []
+        # group2: the nodes having no children in remaining_nodes (out_degree = 0) corresponding to Next2_Gd in paper
+        remaining_nodes = set(self.depnodes)
+        topo = self.topo
         group1 = set()
         group2 = set([node for node in remaining_nodes if out_degree_map[node] == 0])
         
@@ -446,8 +482,10 @@ class DependencyGraph:
                 node = (group1 & group2).pop()
             topo.append(node)
             remaining_nodes.remove(node)
-            group1.remove(node)
-            group2.remove(node)
+            if node in group1:
+                group1.remove(node)
+            if node in group2:
+                group2.remove(node)
             for p in node.parent_nodes:
                 group1.add(p)
                 out_degree_map[p] -= 1
@@ -458,10 +496,10 @@ class DependencyGraph:
                 break
             if not (group1 & group2):
                 if node.node_type == "abstract":
-                    return []
-                # non-uniformly random select a parent node
+                    return False
+                # non-uniformly random select a parent node from group2
                 # and create an edge p_node -> node
-                p_node = random.choice(list(group1)) # TODO: non-uniformly random select
+                p_node = random.choice(list(group2)) # TODO: non-uniformly random select
                 node.parent_nodes.append(p_node)
                 group1.add(p_node)
                 
@@ -474,12 +512,13 @@ class DependencyGraph:
                     group1.add(p_node)
 
         topo.reverse()
-        return topo
+        return True
 
 
-    def construct_Gd4(self, topo: List[DependencyNode]) -> bool:
+    def construct_Gd4(self) -> bool:
         """
         Stage 4 of the dependency graph construction:
+
         Add additional dependency edges to make the graph more complex.
         Specifically, the in-degree of instance nodes should between 1 and 
         `self.max_instance_in_degree` and the final number of operations are
@@ -489,6 +528,7 @@ class DependencyGraph:
         -------
         bool: whether the graph is successfully constructed
         """
+        topo = self.topo
         curr_num_op = [max(1, node.in_degree - 1) for node in topo]
         max_num_op = [min(self.max_instance_in_degree - 1, max(1,i-1)) for i in range(len(topo))]
         while sum(curr_num_op) < self.final_num_op:
@@ -510,12 +550,12 @@ class DependencyGraph:
                     pool.remove(node.parent_nodes[0])
                     dep_num -= 1
                 if dep_num == len(pool):
-                    node.parant_nodes.extend(pool)
+                    node.parent_nodes.extend(pool)
                 else:
                     if random.random() < 0.5:
                         node.parent_nodes.append(self.rng)
                         pool.remove(self.rng)
-                        dep_num -= 1
+                        dep_num = max(0, dep_num - 1) # otherwise dep_num will be -1
                     node.parent_nodes.extend(random.sample(pool, dep_num))
 
         return True
@@ -586,15 +626,16 @@ class DependencyGraph:
 
                     remaining_abstract_params.remove(p)
     
-    def GenSentence(self, node: DependencyNode) -> str:
+    def gen_sentence(self, node: DependencyNode) -> str:
         """
         Generate the Discription for the DependencyNode.
         """
         assert node.node_type == "instance", f"{node.node_type} node does not have a description"
+
         
         desc = f"The number of {node.name} equals"
         _equation = ""
-        # we will modify the order of the parents
+        # the order of the parents may be shuffled
         parents = node.parent_nodes
         has_rng = self.rng in parents
 
@@ -615,7 +656,7 @@ class DependencyGraph:
             _op_str = "sum" if _op == "+" else "difference"
             desc += f" the {_op_str} of {parents[0].name} and {parents[1].name}"
             _equation += f"{{0}} {_op} {{1}}"
-        else:
+        elif len(parents) > 2:
             random.shuffle(parents)
             desc += " the sum of " + ", ".join([p.name for p in parents[:-1]]) + f" and {parents[-1].name}"
             _equation += "(" + " + ".join([f"{{{i}}}" for i in range(len(parents))]) + ")"
