@@ -1,5 +1,4 @@
 from typing import Dict, List, Tuple, Optional
-import numpy as np
 import random
 
 from graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
@@ -11,6 +10,9 @@ DEFAULT_CONFIG = {
     "arithmetic_mod": 23,
     "max_operations": 15,
     "max_attempts": 10,
+
+    "max_instance_params": 20,
+    "max_operations": 15,
 }
 
 # TODO: Implement load_categories
@@ -44,7 +46,7 @@ class ProblemGenerator:
         _cnt = 0
         while not flag:
             _cnt += 1
-            n_items_per_layer = np.random.randint(w0, w1+1, n_layer)
+            n_items_per_layer = [random.randint(w0, w1) for _ in range(n_layer)]
             e_minus = sum(n_items_per_layer[1:])
             e_plus = sum(n_items_per_layer[i]*n_items_per_layer[i+1] for i in range(n_layer-1))
             if e_minus <= n_edge <= e_plus or _cnt > self.config["max_attempts"]:
@@ -63,15 +65,15 @@ class ProblemGenerator:
         edges = []
         for i in range(1, n_layer):
             for j in range(n_items_per_layer[i]):
-                k = np.random.randint(0, n_items_per_layer[i-1])
+                k = random.randint(0, n_items_per_layer[i-1]-1)
                 edges.append(((i-1, k), (i, j)))
         
         # 2.2 generate the remaining edges
         n_current_edges = len(edges)
         while n_current_edges < n_edge:
-            i = np.random.randint(1, n_layer)
-            j = np.random.randint(0, n_items_per_layer[i])
-            k = np.random.randint(0, n_items_per_layer[i-1])
+            i = random.randint(1, n_layer-1)
+            j = random.randint(0, n_items_per_layer[i]-1)
+            k = random.randint(0, n_items_per_layer[i-1]-1)
             if ((i-1, k), (i, j)) not in edges:
                 edges.append(((i-1, k), (i, j)))
                 n_current_edges += 1
