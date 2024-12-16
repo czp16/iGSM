@@ -127,7 +127,10 @@ class ProblemGenerator:
                 raise RuntimeError("No enough variable names for answer.")
             _var_name = all_variables.pop()
             answer_desc.append(self.Gd.gen_answer(node, _var_name))
-        final_answer = " ".join(answer_desc)
+        final_ans_statement = "Thus, the answer is {}.".format(node.value)
+        answer_desc.append(final_ans_statement)
+        
+        final_answer = "\n".join(answer_desc)
         return final_answer
 
 
