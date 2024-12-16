@@ -123,6 +123,8 @@ class ProblemGenerator:
             [chr(i) for i in range(ord('A'), ord('Z') + 1)] # upper case
         )
         for node in self.Gd.topo:
+            if not all_variables:
+                raise RuntimeError("No enough variable names for answer.")
             _var_name = all_variables.pop()
             answer_desc.append(self.Gd.gen_answer(node, _var_name))
         final_answer = " ".join(answer_desc)
@@ -130,8 +132,8 @@ class ProblemGenerator:
 
 
 if __name__ == "__main__":
-    # seed = random.randint(0, 100000)
-    seed = 57849
+    seed = random.randint(0, 100000)
+    # seed = 57849
     random.seed(seed)
     np.random.seed(seed)
     print(f"Seed: {seed}")

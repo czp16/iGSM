@@ -549,7 +549,7 @@ class DependencyGraph:
         """
         topo = self.topo
         curr_num_op = [max(1, node.in_degree - 1) for node in topo]
-        max_num_op = [min(self.max_instance_in_degree - 1, max(1,i-1)) for i in range(len(topo))]
+        max_num_op = [min(self.max_instance_in_degree - 1, max(1,i)) for i in range(len(topo))]
         while sum(curr_num_op) < self.final_num_op:
             # randomly select a node to increase its in-degree
             candidates = [i for i, node in enumerate(topo) if curr_num_op[i] < max_num_op[i] and node.node_type == "instance"]
