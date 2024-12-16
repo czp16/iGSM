@@ -12,7 +12,7 @@ DEFAULT_CONFIG = {
     "max_instance_in_degree": 4,
     "arithmetic_mod": 23,
     "max_operations": 15,
-    "max_attempts": 10,
+    "max_attempts": 50,
 
     "max_instance_params": 20,
     "max_operations": 15,
@@ -69,7 +69,7 @@ class ProblemGenerator:
         _t0, _t1 = [random.randint((num_layers - 1) * w0, max_ip) for _ in range(2)]
         num_edges = min(_t0, _t1, (num_layers - 1) * w1 * w1)
 
-        return num_layers, w0, w1, num_edges
+        return w0, w1, num_layers, num_edges
 
 
     
@@ -80,9 +80,11 @@ class ProblemGenerator:
         max_op_stage1 = max([random.randint(1, final_num_op) for _ in range(2)])
         max_op_stage2 = random.randint(max_op_stage1, final_num_op)
 
-        num_layers, w0, w1, num_edges = self._get_structuregraph_hp(final_num_op)
+        w0, w1, num_layers, num_edges = self._get_structuregraph_hp(final_num_op)
         self.name_dictionary = self.name_dictionary[:num_layers]
         self.categorey_name = self.categorey_name[:num_layers]
+
+        print(f"num_layers: {num_layers}, w0: {w0}, w1: {w1}, num_edges: {num_edges}")
 
         flag = False
         _cnt = 0
@@ -104,18 +106,32 @@ class ProblemGenerator:
                 self.Gd = Gd
         
 
-    def generate_question(self) -> List[str]:
+    def generate_question(self) -> str:
         question_desc = []
         for node in self.Gd.topo:
             if node.node_type == "instance":
                 question_desc.append(self.Gd.gen_sentence(node))
-
-        return question_desc
+        random.shuffle(question_desc)
+        question_desc.append(self.Gd.gen_question(node))
+        final_question = ". ".join(question_desc)
+        return final_question
+    
+    def generate_answer(self) -> str:
+        answer_desc = []
+        all_variables = set(
+            [chr(i) for i in range(ord('a'), ord('z') + 1)] + # lower case
+            [chr(i) for i in range(ord('A'), ord('Z') + 1)] # upper case
+        )
+        for node in self.Gd.topo:
+            _var_name = all_variables.pop()
+            answer_desc.append(self.Gd.gen_answer(node, _var_name))
+        final_answer = " ".join(answer_desc)
+        return final_answer
 
 
 if __name__ == "__main__":
-    seed = random.randint(0, 100000)
-    # seed = 9935
+    # seed = random.randint(0, 100000)
+    seed = 57849
     random.seed(seed)
     np.random.seed(seed)
     print(f"Seed: {seed}")
@@ -123,3 +139,4 @@ if __name__ == "__main__":
     pg = ProblemGenerator(DEFAULT_CONFIG)
     pg.draw_question()
     print(pg.generate_question())
+    print(pg.generate_answer())

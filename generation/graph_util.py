@@ -100,6 +100,7 @@ class DependencyNode(Node):
         self.eval_equation = eval_equation
         self.name = name
         self.value = value
+        self.var_name = "" # only used for answer generation
 
     def get_equation(self):
         """
@@ -109,10 +110,10 @@ class DependencyNode(Node):
             if len(self.parent_nodes) > 1 and self.parent_nodes[1].node_type == "abstract": 
                 # difficult level >= 2, should be {0} * {1} + {2} * {3} + ...
                 # then we will get the value by `eval(eval_equation.format(*[p.value for p in self.parent_nodes]))`
-                self.eval_equation = "+".join([f"{{{i}}}*{{{i+1}}}" for i in range(0, len(self.parent_nodes), 2)])
+                self.eval_equation = " + ".join([f"{{{i}}} * {{{i+1}}}" for i in range(0, len(self.parent_nodes), 2)])
             else:
                 # difficult level = 1, should be {0} + {1} + {2} + ...
-                self.eval_equation = "+".join([f"{{{i}}}" for i in range(len(self.parent_nodes))])
+                self.eval_equation = " + ".join([f"{{{i}}}" for i in range(len(self.parent_nodes))])
 
         else:
             raise ValueError("Instance node does not have an operation")
@@ -171,18 +172,34 @@ class StructureGraph:
         max_attempts = 10
 
         # 1. Randomly generate the number of items per layer
-        flag = False
-        _cnt = 0
-        while not flag:
-            _cnt += 1
-            n_items_per_layer = [random.randint(w0, w1) for _ in range(num_layers)]
+        # 
+        # flag = False
+        # _cnt = 0
+        # while not flag:
+        #     _cnt += 1
+        #     n_items_per_layer = [random.randint(w0, w1) for _ in range(num_layers)]
+        #     e_minus = sum(n_items_per_layer[1:])
+        #     e_plus = sum(n_items_per_layer[i]*n_items_per_layer[i+1] for i in range(num_layers-1))
+        #     if e_minus <= num_edges <= e_plus or _cnt > max_attempts:
+        #         flag = True
+        # if _cnt > max_attempts:
+        #     raise RuntimeError("Cannot generate the structure graph.")
+        
+        n_items_per_layer = [w0 for _ in range(num_layers)]
+        _prob = random.random()
+        while True:
+            if all([n_items_per_layer[i] == w1 for i in range(num_layers)]):
+                break
             e_minus = sum(n_items_per_layer[1:])
             e_plus = sum(n_items_per_layer[i]*n_items_per_layer[i+1] for i in range(num_layers-1))
-            if e_minus <= num_edges <= e_plus or _cnt > max_attempts:
-                flag = True
-        if _cnt > max_attempts:
-            raise RuntimeError("Cannot generate the structure graph.")
-        
+            if e_minus == num_edges:
+                break
+            elif e_plus < num_edges or random.random() < _prob:
+                idx = random.choice([i for i in range(num_layers) if n_items_per_layer[i] < w1])
+                n_items_per_layer[idx] += 1
+            else:
+                break
+
         # 2. Randomly generate the nodes and edges
         # list of nodes in each layer, looking like [[x0,x1,x2], [y0,y1,y2,y3], ...]
         # then we can get the node by self.nodes[li][ni]
@@ -350,8 +367,10 @@ class DependencyGraph:
         self.depnodes = list(self.param2depnode.values())
 
         if not self.construct_Gd3():
+            print("Failed to construct Gd3")
             return False
         if not self.construct_Gd4():
+            print("Failed to construct Gd4")
             return False
         self.construct_Gd()
         return True
@@ -535,6 +554,7 @@ class DependencyGraph:
             # randomly select a node to increase its in-degree
             candidates = [i for i, node in enumerate(topo) if curr_num_op[i] < max_num_op[i] and node.node_type == "instance"]
             if not candidates:
+                print(self.final_num_op, max_num_op, curr_num_op)
                 return False
             curr_num_op[random.choice(candidates)] += 1
         
@@ -649,13 +669,13 @@ class DependencyGraph:
                 _equation += random.choice([" + ", " * "])
         if len(parents) == 1:
             desc += f" {parents[0].name}"
-            _equation += f"{parents[0].value}"
+            _equation += "{0}"
         elif len(parents) == 2:
             random.shuffle(parents)
             _op = random.choice(["+", "-"])
             _op_str = "sum" if _op == "+" else "difference"
             desc += f" the {_op_str} of {parents[0].name} and {parents[1].name}"
-            _equation += f"{{0}} {_op} {{1}}"
+            _equation += f"{{{0}}} {_op} {{{1}}}" # should be "{0} + {1}" or "{0} - {1}"
         elif len(parents) > 2:
             random.shuffle(parents)
             desc += " the sum of " + ", ".join([p.name for p in parents[:-1]]) + f" and {parents[-1].name}"
@@ -665,3 +685,46 @@ class DependencyGraph:
         if has_rng:
             parents.append(self.rng)
         return desc
+
+    def gen_question(self, node: DependencyNode) -> str:
+        """
+        Generate the question for the DependencyNode.
+        """
+        assert node.node_type in ["instance", "abstract"], f"{node.node_type} node does not have a question"
+        args = node.name.split("'s ")
+        arg0, arg1 = args[0], args[1]
+        desc = f"How many {arg1} does {arg0} have?"
+        return desc
+
+    def gen_answer(self, node: DependencyNode, variable_name: str) -> str:
+        """
+        Generate the answer for the DependencyNode.
+
+        Parameters:
+        ------------
+        node: the DependencyNode
+        variable_name: the name of the variable in the answer for simplicity, it can be "a-z" or "A-Z"
+        """
+        assert node.node_type in ["instance", "abstract"], f"{node.node_type} node does not have an answer"
+        node.var_name = variable_name
+        parents = node.parent_nodes if node.parent_nodes[-1] != self.rng else node.parent_nodes[:-1]
+        
+        # only plug in the var_name of parent nodes, e.g., b + 3
+        eval_equation1 = node.eval_equation.format(*[p.var_name for p in parents]) 
+        # only plug in the val of parent nodes, e.g., 5 + 3 (suppose b = 5)
+        eval_equation2 = node.eval_equation.format(*[p.value for p in parents]) 
+        # final val of the node
+        node.value = eval(eval_equation2) % self.mod
+
+        print(f"node {node.name}: var_name: {node.var_name}, eval_eq: {node.eval_equation}, parents: {[p.name for p in node.parent_nodes]}, value: {node.value}")
+
+        if parents:
+            if any([_op in eval_equation2 for _op in ["+", "-", "*"]]):
+                solution = f"{variable_name} = {eval_equation1} = {eval_equation2} = {node.value}"
+            else:
+                solution = f"{variable_name} = {eval_equation1} = {node.value}"
+        else:
+            solution = f"{variable_name} = {node.value}"
+
+        answer_desc = f"Define {node.name} as {variable_name}. So {solution}."
+        return answer_desc
