@@ -3,8 +3,8 @@ import random
 import json
 import numpy as np
 
-from utils import softmax
-from graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
+from igsm_gym.utils import softmax
+from .graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
 
 DEFAULT_CONFIG = {
     "english_path": "english/categorization.json",
@@ -27,7 +27,7 @@ def load_categories() -> Dict[str, List[Dict]]:
     return {}
 
 class ProblemGenerator:
-    def __init__(self, config: Dict, debug: bool = False):
+    def __init__(self, config: Dict = {}, debug: bool = False):
         self.config = config
         self.debug = debug
         for k,v in DEFAULT_CONFIG.items():

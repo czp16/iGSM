@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple, Dict, Any, Literal
 from collections import deque
 import random
 import numpy as np
-from utils import softmax
+from igsm_gym.utils.misc import softmax
 
 class Node:
     def __init__(

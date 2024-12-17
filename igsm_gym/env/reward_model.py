@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Any, Optional, List, Tuple, Dict
-from problem_generation import *
+
+from igsm_gym.generation import DependencyGraph
 import re
 
 """_summary_
@@ -20,11 +21,16 @@ REWARD_DEFAULT_CONFIG = {
 class RewardModel:
     def __init__(
         self,
-        reward_config: Dict,
-        Gd: DependencyGraph,
+        reward_config: Dict = {},
+        Gd: Optional[DependencyGraph] = None,
     ) -> None:
         self.Gd = Gd
         self.config = reward_config
+        for k,v in REWARD_DEFAULT_CONFIG.items():
+            if k not in self.config:
+                self.config[k] = v
+
+        assert self.Gd is not None
         self.Gd_topo_node = {node.name : node.value for node in self.Gd.topo}
     
     def PRM(self, llm_output: str) -> List[float]: 
