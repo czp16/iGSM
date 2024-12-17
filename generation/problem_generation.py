@@ -1,12 +1,15 @@
 from typing import Dict, List, Tuple, Optional
 import random
+import json
 import numpy as np
 
 from utils import softmax
 from graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
 
 DEFAULT_CONFIG = {
-    "structure_layers": 4,
+    "english_path": "english/categorization.json",
+
+    "max_structure_layers": 4,
     "min_items_per_layer": 2,
     "max_items_per_layer": 4,
     "max_instance_in_degree": 4,
@@ -15,8 +18,8 @@ DEFAULT_CONFIG = {
     "max_attempts": 50,
 
     "max_instance_params": 20,
-    "max_operations": 15,
-    "force": False, # force the operation num to be exactly `max_operations``
+    "max_operations": 21,
+    "force": True, # force the operation num to be exactly `max_operations`
 }
 
 # TODO: Implement load_categories
@@ -24,24 +27,34 @@ def load_categories() -> Dict[str, List[Dict]]:
     return {}
 
 class ProblemGenerator:
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, debug: bool = False):
         self.config = config
+        self.debug = debug
         for k,v in DEFAULT_CONFIG.items():
             if k not in self.config:
                 self.config[k] = v
 
-        self._load_name_dictionary()
-
     def _load_name_dictionary(self):
-        # TODO: modify it later
-        self.name_dictionary = [
-            [f"W{i}" for i in range(10)],
-            [f"X{i}" for i in range(10)],
-            [f"Y{i}" for i in range(10)],
-            [f"Z{i}" for i in range(10)],
-        ]
-        self.categorey_name = ["WWW", "XXX", "YYY", "ZZZ"]
-    
+        if self.debug:
+            self.name_dictionary = [
+                [f"W{i}" for i in range(10)],
+                [f"X{i}" for i in range(10)],
+                [f"Y{i}" for i in range(10)],
+                [f"Z{i}" for i in range(10)],
+            ]
+            self.category_name = ["WWW", "XXX", "YYY", "ZZZ"]
+        else:
+            with open(self.config["english_path"], 'r') as f:
+                all_data = json.load(f)
+            system = all_data.get(random.choice(list(all_data.keys())))
+            self.category_name = list(system.keys())
+            
+            self.name_dictionary = []
+            for sub_category in system.values():
+                self.name_dictionary.append(sub_category.get(random.choice(list(sub_category.keys()))))
+
+            self.category_name.reverse()
+            self.name_dictionary.reverse()
     
     def _get_structuregraph_hp(self, final_num_op: int) -> int:
         """
@@ -58,7 +71,7 @@ class ProblemGenerator:
         w1: int, the maximum number of items per layer
         num_edges: int, the number of edges in the structure graph.
         """
-        assert self.config["structure_layers"] == 4
+        assert self.config["max_structure_layers"] == 4
         max_ip = self.config["max_instance_params"]
         rel = (final_num_op - 1) / (max_ip - 1)
         _weights = np.array([-(rel-0.2)**2, -(rel-0.5)**2, -(rel-0.8)**2])
@@ -73,7 +86,16 @@ class ProblemGenerator:
 
 
     
-    def draw_question(self):
+    def draw_question(self) -> bool:
+        """
+        Randomly generate the structure graph and dependency graph to draw the question.
+
+        Returns:
+        ----------
+        bool, whether the question is successfully generated
+        """
+        self._load_name_dictionary()
+
         max_operations = self.config['max_operations']
         force = self.config['force']
         final_num_op = max_operations if force else min([random.randint(1, max_operations) for _ in range(2)])
@@ -81,29 +103,35 @@ class ProblemGenerator:
         max_op_stage2 = random.randint(max_op_stage1, final_num_op)
 
         w0, w1, num_layers, num_edges = self._get_structuregraph_hp(final_num_op)
-        self.name_dictionary = self.name_dictionary[:num_layers]
-        self.categorey_name = self.categorey_name[:num_layers]
+        _start_layer = random.randint(0, self.config["max_structure_layers"] - num_layers)
+        self.name_dictionary = self.name_dictionary[_start_layer:_start_layer+num_layers]
+        self.category_name = self.category_name[_start_layer:_start_layer+num_layers]
 
-        print(f"num_layers: {num_layers}, w0: {w0}, w1: {w1}, num_edges: {num_edges}")
+        # print(f"num_layers: {num_layers}, w0: {w0}, w1: {w1}, num_edges: {num_edges}")
 
         flag = False
         _cnt = 0
         while not flag:
             _cnt += 1
-            if _cnt > self.config["max_attempts"]:
-                raise RuntimeError("Cannot generate the structure graph.")
+            if _cnt > self.config["max_attempts"]: 
+                # will retry if stage 3 failed until max_attempts
+                return False
 
             # Generate the structure graph
-            Gs = StructureGraph(w0, w1, num_layers, num_edges, self.name_dictionary, self.categorey_name)
+            Gs = StructureGraph(w0, w1, num_layers, num_edges, self.name_dictionary, self.category_name)
             # Generate the dependency graph
             Gd = DependencyGraph(
                 Gs, max_op_stage1, max_op_stage2, final_num_op,
                 self.config["max_instance_in_degree"], self.config["arithmetic_mod"]
             )
-            if Gd.construct_dependency_graph():
+            result = Gd.construct_dependency_graph()
+            if result == "success":
                 flag = True
                 self.Gs = Gs
                 self.Gd = Gd
+            elif result == "stage 4 failed": # will not retry if stage 4 failed
+                return False
+        return True
         
 
     def generate_question(self) -> str:
@@ -133,12 +161,23 @@ class ProblemGenerator:
 
 if __name__ == "__main__":
     seed = random.randint(0, 100000)
-    # seed = 57849
+    # seed = 2927
     random.seed(seed)
     np.random.seed(seed)
     print(f"Seed: {seed}")
 
     pg = ProblemGenerator(DEFAULT_CONFIG)
-    pg.draw_question()
-    print(pg.generate_question())
-    print(pg.generate_answer())
+    if pg.draw_question():
+        print(pg.generate_question())
+        print(pg.generate_answer())
+    else:
+        print("Failed to generate the question.")
+
+    # _cnt = 0
+
+    # for _ in range(100):
+    #     pg = ProblemGenerator(DEFAULT_CONFIG)
+    #     if pg.draw_question():
+    #         _cnt += 1
+
+    # print(f"Success rate: {_cnt} / {100}")

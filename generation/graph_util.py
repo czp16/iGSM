@@ -2,8 +2,10 @@
 define the node and graph classes
 """
 from typing import List, Optional, Tuple, Dict, Any, Literal
+from collections import deque
 import random
-from collections import deque, namedtuple
+import numpy as np
+from utils import softmax
 
 class Node:
     def __init__(
@@ -20,7 +22,8 @@ class Node:
         ------------
         parent_nodes: the parent nodes that it depends on, e.g., if there are school backpacks in the \
             art classroom, then school backpack is one of the parent nodes of the art classroom.
-        index: the index of the node, which is a tuple of (layer index, node index).        name: the name of the node, i.e., "school backpack" or "art classroom".
+        index: the index of the node, which is a tuple of (layer index, node index).
+        name: the name of the node, i.e., "school backpack" or "art classroom".
         """
         self.parent_nodes = parent_nodes
         self.index = index
@@ -172,18 +175,6 @@ class StructureGraph:
         max_attempts = 10
 
         # 1. Randomly generate the number of items per layer
-        # 
-        # flag = False
-        # _cnt = 0
-        # while not flag:
-        #     _cnt += 1
-        #     n_items_per_layer = [random.randint(w0, w1) for _ in range(num_layers)]
-        #     e_minus = sum(n_items_per_layer[1:])
-        #     e_plus = sum(n_items_per_layer[i]*n_items_per_layer[i+1] for i in range(num_layers-1))
-        #     if e_minus <= num_edges <= e_plus or _cnt > max_attempts:
-        #         flag = True
-        # if _cnt > max_attempts:
-        #     raise RuntimeError("Cannot generate the structure graph.")
         
         n_items_per_layer = [w0 for _ in range(num_layers)]
         _prob = random.random()
@@ -262,7 +253,7 @@ class StructureGraph:
                         # in this case, the value of the abstract parameter is the sum of its parents
                         # i.e., the operation (will be defined in the DependencyGraph) is f"{parent.value} + ..."
                         # TODO: remove the assert statement if the graph is correct
-                        assert (parent.index, (lj, nj)) in self.edges, f"Invalid edge: {parent.index} -> {(lj,nj)}"
+                        # assert (parent.index, (lj, nj)) in self.edges, f"Invalid edge: {parent.index} -> {(lj,nj)}"
                         param.parent_nodes.append(index2param[(parent.index, (lj, nj))])
                         
                 elif lj - li > 1:
@@ -271,7 +262,7 @@ class StructureGraph:
                         # in this case, the value of the abstract parameter is the sum of its instance parent times
                         # the abstract parent, i.e., the operation is f"{parents[0].value} * {parents[1].value} + ..."
                         # TODO: remove the assert statement if the graph is correct
-                        assert (parent.index, (lj, nj)) in self.edges, f"Invalid edge: {parent.index} -> {(lj,nj)}"
+                        # assert (parent.index, (lj, nj)) in self.edges, f"Invalid edge: {parent.index} -> {(lj,nj)}"
                         param.parent_nodes.append(index2param[(parent.index, (lj, nj))]) # instance parameter
                         param.parent_nodes.append(index2param[(li, parent.index)]) # abstract parameter
                 else:
@@ -351,13 +342,13 @@ class DependencyGraph:
         self.rng = DependencyNode([], "rng", name="RNG", value=0)
         self.topo: List[DependencyNode] = []
 
-    def construct_dependency_graph(self) -> bool:
+    def construct_dependency_graph(self) -> Literal["success", "stage 3 failed", "stage 4 failed"]:
         """
         Construct the dependency graph of the structure graph.
 
         Return:
         -------
-        bool: whether the graph is successfully constructed
+        str: whether the graph is successfully constructed
         """
         # This dictionary will map from a Parameter to its corresponding DependencyNode.
         self.param2depnode: Dict[Parameter, DependencyNode] = {}
@@ -367,13 +358,13 @@ class DependencyGraph:
         self.depnodes = list(self.param2depnode.values())
 
         if not self.construct_Gd3():
-            print("Failed to construct Gd3")
-            return False
+            # print("Failed to construct Gd3")
+            return "stage 3 failed"
         if not self.construct_Gd4():
-            print("Failed to construct Gd4")
-            return False
+            # print("Failed to construct Gd4")
+            return "stage 4 failed"
         self.construct_Gd()
-        return True
+        return "success"
 
 
 
@@ -500,11 +491,9 @@ class DependencyGraph:
             else:
                 node = (group1 & group2).pop()
             topo.append(node)
-            remaining_nodes.remove(node)
-            if node in group1:
-                group1.remove(node)
-            if node in group2:
-                group2.remove(node)
+            remaining_nodes.discard(node)
+            group1.discard(node)
+            group2.discard(node)
             for p in node.parent_nodes:
                 group1.add(p)
                 out_degree_map[p] -= 1
@@ -517,16 +506,29 @@ class DependencyGraph:
                 if node.node_type == "abstract":
                     return False
                 # non-uniformly random select a parent node from group2
-                # and create an edge p_node -> node
-                p_node = random.choice(list(group2)) # TODO: non-uniformly random select
+                # weight of non-uniform random selection
+                group2_list = list(group2)
+                _g = abs(np.random.randn())
+                _w = [int(node.node_type == "abstract") + int(node in group1) for node in group2_list]
+                _w = softmax(np.array(_w))
+                p_node = np.random.choice(group2_list, p=_w) # non-uniform random selection
+
+                # and create an edge p_node -> node; note `node` is not in remaining_nodes
+                # so p_node is still in group2; meanwhile p_node will be added to group1
+                # then p_node \in group1 \cap group2
                 node.parent_nodes.append(p_node)
                 group1.add(p_node)
                 
             elif node.node_type == "instance":
                 if random.random() < 0.5:
-                    # non-uniformly random select a parent node
+                    # non-uniformly random select a parent node, same as above
+                    remaining_nodes_list = list(remaining_nodes)
+                    _g = abs(np.random.randn())
+                    _w = [int(node.node_type == "abstract") + int(node in group1) for node in remaining_nodes_list]
+                    _w = softmax(np.array(_w))
+                    p_node = np.random.choice(remaining_nodes_list, p=_w) # non-uniform random selection
+
                     # and create an edge p_node -> node
-                    p_node = random.choice(list(remaining_nodes))
                     node.parent_nodes.append(p_node)
                     group1.add(p_node)
 
@@ -554,7 +556,6 @@ class DependencyGraph:
             # randomly select a node to increase its in-degree
             candidates = [i for i, node in enumerate(topo) if curr_num_op[i] < max_num_op[i] and node.node_type == "instance"]
             if not candidates:
-                print(self.final_num_op, max_num_op, curr_num_op)
                 return False
             curr_num_op[random.choice(candidates)] += 1
         
@@ -716,7 +717,7 @@ class DependencyGraph:
         # final val of the node
         node.value = eval(eval_equation2) % self.mod
 
-        print(f"node {node.name}: var_name: {node.var_name}, eval_eq: {node.eval_equation}, parents: {[p.name for p in node.parent_nodes]}, value: {node.value}")
+        # print(f"node {node.name}: var_name: {node.var_name}, eval_eq: {node.eval_equation}, parents: {[p.name for p in node.parent_nodes]}, value: {node.value}")
 
         if parents:
             if any([_op in eval_equation2 for _op in ["+", "-", "*"]]):
