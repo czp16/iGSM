@@ -4,7 +4,7 @@ import json
 import numpy as np
 
 from igsm_gym.utils import softmax
-from .graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
+from igsm_gym.generation.graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
 
 DEFAULT_CONFIG = {
     "english_path": "english/categorization.json",
@@ -18,13 +18,10 @@ DEFAULT_CONFIG = {
     "max_attempts": 50,
 
     "max_instance_params": 20,
-    "max_operations": 21,
+    "max_operations": 11,
     "force": True, # force the operation num to be exactly `max_operations`
 }
 
-# TODO: Implement load_categories
-def load_categories() -> Dict[str, List[Dict]]:
-    return {}
 
 class ProblemGenerator:
     def __init__(self, config: Dict = {}, debug: bool = False):

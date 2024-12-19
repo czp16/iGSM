@@ -73,13 +73,13 @@
             "Elementary Backpack": ["Puppy Backpack", "Cartoon Bag", "Rainbow Backpack", "Lightweight Bag", "Basketball Bag"],
             "High School Backpack": ["Multi-Compartment Backpack", "Padded Laptop Bag", "Trendy Canvas Backpack", "Durable Nylon Bag"],
             "Sports Backpack": ["Soccer Gear Bag", "Gym Duffel Backpack", "Shoe Compartment Backpack", "Travel Bag", "Weatherproof Bag"],
-            "Stylish Backpack": ["Leather Laptop Bag", "Manager Backpack", "Fashion Tote-Backpack", "Printed Casual Backpack", "Designer bag"]
+            "Stylish Backpack": ["Leather Laptop Bag", "Manager Backpack", "Fashion Tote-Backpack", "Printed Casual Backpack", "Designer Bag"]
         },
         "Stationery": {
             "Writing Tools": ["Ballpoint Pen", "Fountain Pen", "Mechanical Pencil", "Marker Pen"],
             "Paper Products": ["Notebook", "Graph Paper", "Sticky Note", "Sketch Pad"],
             "Organization Supplies": ["File Folder", "Binder", "Document Tray", "Pen Holder", "Pinner"],
-            "Office Essentials": ["Stapler", "Paper Clips", "Tape", "Eraser", "Card"]
+            "Office Essentials": ["Stapler", "Paper Clips", "Tape", "Eraser", "Note Card"]
         }
     }
 }

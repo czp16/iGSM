@@ -8,6 +8,10 @@ import numpy as np
 from igsm_gym.utils.misc import softmax
 
 class Node:
+    """
+    Node representing a node in a `StructureGraph`. Each node has an index, which is a tuple of
+    (layer index, node index), e.g., (li, ni) means the ni-th node in the li-th layer.
+    """
     def __init__(
         self,
         parent_nodes: List["Node"], 
@@ -15,9 +19,6 @@ class Node:
         name: Optional[str] = None,
     ):
         """
-        Node representing a node in a `StructureGraph`. Each node has an index, which is a tuple of
-        (layer index, node index), e.g., (li, ni) means the ni-th node in the li-th layer.
-
         Parameters:
         ------------
         parent_nodes: the parent nodes that it depends on, e.g., if there are school backpacks in the \
@@ -105,21 +106,19 @@ class DependencyNode(Node):
         self.value = value
         self.var_name = "" # only used for answer generation
 
-    def get_equation(self):
+    def get_equation(self) -> str:
         """
-        Get the operation that the node performs from parent nodes.
+        Get the operation that the node performs from parent nodes, only for abstract nodes.
         """
-        if self.node_type == "abstract":
-            if len(self.parent_nodes) > 1 and self.parent_nodes[1].node_type == "abstract": 
-                # difficult level >= 2, should be {0} * {1} + {2} * {3} + ...
-                # then we will get the value by `eval(eval_equation.format(*[p.value for p in self.parent_nodes]))`
-                self.eval_equation = " + ".join([f"{{{i}}} * {{{i+1}}}" for i in range(0, len(self.parent_nodes), 2)])
-            else:
-                # difficult level = 1, should be {0} + {1} + {2} + ...
-                self.eval_equation = " + ".join([f"{{{i}}}" for i in range(len(self.parent_nodes))])
+        assert self.node_type == "abstract", f"{self.node_type} node does not use this function"
 
+        if len(self.parent_nodes) > 1 and self.parent_nodes[1].node_type == "abstract": 
+            # difficult level >= 2, should be {0} * {1} + {2} * {3} + ...
+            # then we will get the value by `eval(eval_equation.format(*[p.value for p in self.parent_nodes]))`
+            self.eval_equation = " + ".join([f"{{{i}}} * {{{i+1}}}" for i in range(0, len(self.parent_nodes), 2)])
         else:
-            raise ValueError("Instance node does not have an operation")
+            # difficult level = 1, should be {0} + {1} + {2} + ...
+            self.eval_equation = " + ".join([f"{{{i}}}" for i in range(len(self.parent_nodes))])
 
 
 class StructureGraph:
@@ -510,7 +509,7 @@ class DependencyGraph:
                 group2_list = list(group2)
                 _g = abs(np.random.randn())
                 _w = [int(node.node_type == "abstract") + int(node in group1) for node in group2_list]
-                _w = softmax(np.array(_w))
+                _w = softmax(np.array(_w) * _g)
                 p_node = np.random.choice(group2_list, p=_w) # non-uniform random selection
 
                 # and create an edge p_node -> node; note `node` is not in remaining_nodes
@@ -525,7 +524,7 @@ class DependencyGraph:
                     remaining_nodes_list = list(remaining_nodes)
                     _g = abs(np.random.randn())
                     _w = [int(node.node_type == "abstract") + int(node in group1) for node in remaining_nodes_list]
-                    _w = softmax(np.array(_w))
+                    _w = softmax(np.array(_w) * _g)
                     p_node = np.random.choice(remaining_nodes_list, p=_w) # non-uniform random selection
 
                     # and create an edge p_node -> node
