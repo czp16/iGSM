@@ -14,7 +14,6 @@ DEFAULT_CONFIG = {
     "max_items_per_layer": 4,
     "max_instance_in_degree": 4,
     "arithmetic_mod": 23,
-    "max_operations": 15,
     "max_attempts": 50,
 
     "max_instance_params": 20,
