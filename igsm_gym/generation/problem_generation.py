@@ -1,5 +1,6 @@
 from typing import Dict, List, Tuple, Optional
 import random
+import os
 import json
 import numpy as np
 
@@ -44,14 +45,12 @@ class ProblemGenerator:
             #     all_data = json.load(f)
             all_data = english_dict
             ecosystem_name = random.choice(list(all_data.keys()))
-            print(f"Using ecosystem: {ecosystem_name}")
             system = all_data.get(ecosystem_name)
             self.category_name = list(system.keys())
             
             self.name_dictionary = []
             for sub_category in system.values():
                 sub_category_name = random.choice(list(sub_category.keys()))
-                print(f"Using sub-category: {sub_category_name}")
                 self.name_dictionary.append(sub_category.get(sub_category_name))
 
             self.category_name.reverse()
@@ -83,8 +82,6 @@ class ProblemGenerator:
         _t0, _t1 = [random.randint((num_layers - 1) * w0, max_ip) for _ in range(2)]
         num_edges = min(_t0, _t1, (num_layers - 1) * w1 * w1)
 
-        print(f"num_layers: {num_layers}, w0: {w0}, w1: {w1}, num_edges: {num_edges}")
-
         return w0, w1, num_layers, num_edges
 
 
@@ -111,8 +108,6 @@ class ProblemGenerator:
         self.category_name = self.category_name[_start_layer:_start_layer+num_layers]
 
         # print(f"num_layers: {num_layers}, w0: {w0}, w1: {w1}, num_edges: {num_edges}")
-        print(f"Random state (random): {random.randint(0, 100000)}")
-        print(f"NP Random state (random): {np.random.randint(0, 100000)}")
 
         flag = False
         _cnt = 0
@@ -141,8 +136,6 @@ class ProblemGenerator:
 
     def generate_question(self) -> str:
         question_desc = []
-        print(f"Random state (random): {random.randint(0, 100000)}")
-        print(f"NP Random state (random): {np.random.randint(0, 100000)}")
         for node in self.Gd.topo:
             if node.node_type == "instance":
                 question_desc.append(self.Gd.gen_sentence(node))
@@ -171,8 +164,9 @@ class ProblemGenerator:
 
 if __name__ == "__main__":
     # seed = random.randint(0, 100000)
-    seed = 489
+    seed = 32489
     random.seed(seed)
+    # os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
     print(f"Seed: {seed}")
 
