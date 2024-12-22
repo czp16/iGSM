@@ -3,11 +3,11 @@ import random
 import json
 import numpy as np
 
-from igsm_gym.utils import softmax
+from igsm_gym.utils import softmax, seed_all
 from igsm_gym.generation.graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
 
 DEFAULT_CONFIG = {
-    "english_path": "english/categorization.json",
+    "english_path": "/home/yihang/code/Agent/iGSM/igsm_gym/generation/english/categorization.json",
 
     "max_structure_layers": 4,
     "min_items_per_layer": 2,
@@ -23,7 +23,8 @@ DEFAULT_CONFIG = {
 
 
 class ProblemGenerator:
-    def __init__(self, config: Dict = {}, debug: bool = False):
+    def __init__(self, config: Dict = {}, debug: bool = False, seed=0):
+        seed_all(seed=seed)
         self.config = config
         self.debug = debug
         for k,v in DEFAULT_CONFIG.items():
@@ -142,14 +143,20 @@ class ProblemGenerator:
     
     def generate_answer(self) -> str:
         answer_desc = []
-        all_variables = set(
+        all_variables = list(
             [chr(i) for i in range(ord('a'), ord('z') + 1)] + # lower case
             [chr(i) for i in range(ord('A'), ord('Z') + 1)] # upper case
         )
+        all_variables = sorted(all_variables)
+        # seed_all(2900)
+        print("random int:", random.randint(0, 100))
+        random.shuffle(all_variables)
+        print("all_variables:", all_variables)
         for node in self.Gd.topo:
             if not all_variables:
                 raise RuntimeError("No enough variable names for answer.")
             _var_name = all_variables.pop()
+            print("varname:", _var_name)
             answer_desc.append(self.Gd.gen_answer(node, _var_name))
         final_ans_statement = "Thus, the answer is {}.".format(node.value)
         answer_desc.append(final_ans_statement)
@@ -159,13 +166,14 @@ class ProblemGenerator:
 
 
 if __name__ == "__main__":
-    seed = random.randint(0, 100000)
-    # seed = 2927
-    random.seed(seed)
-    np.random.seed(seed)
+    # seed = random.randint(0, 100000)
+    seed = 2900
+    # random.seed(seed)
+    # np.random.seed(seed)
     print(f"Seed: {seed}")
+    seed_all(seed)
 
-    pg = ProblemGenerator(DEFAULT_CONFIG)
+    pg = ProblemGenerator(DEFAULT_CONFIG, debug=True, seed=seed)
     if pg.draw_question():
         print(pg.generate_question())
         print(pg.generate_answer())
