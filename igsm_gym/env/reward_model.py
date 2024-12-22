@@ -15,6 +15,7 @@ REWARD_DEFAULT_CONFIG = {
     "correct_step_reward": 1.0,
     "wrong_step_reward": 0.0,
     "redundant_step_reward": 0.1,
+    "mismatch_step_reward": -0.1,
     "PRM": True,
 }
 
@@ -38,6 +39,7 @@ class RewardModel:
         # Calculate reward based on llm_output trajectory (one turn)
         
         sentence_list = llm_output.split('\n') # List["Define each Y9's X7 as b. So b = 9."]
+            
         final_answer = sentence_list.pop() # "Thus, the answer is ..."
         final_answer_value = float(final_answer.split(' ')[-1]) 
         
@@ -46,7 +48,8 @@ class RewardModel:
             # The template string
             template = sentence
             # Define the regular expression pattern
-            pattern = r"Define (.+?) as (\w+)\. So \2 = .* = (\d+)\."
+            
+            pattern = r"(?:Define each |Each )?(.+?) as (\w+)\. So \2 = (?:.*= )?(\d+)\." # r"Define (.+?) as (\w+)\. So \2 = .* = (\d+)\."
             # Match the pattern in the string
             match = re.match(pattern, template)
             # print("pattern:")
@@ -59,6 +62,7 @@ class RewardModel:
 
             if match:
                 node_name = match.group(1)  # node name
+                node_name = "each " + node_name
                 var_name = match.group(2)   # var name
                 value = match.group(3)   # var value
                 
@@ -72,7 +76,12 @@ class RewardModel:
                 # print("@"*10)
                 # print(sentence)
                 # print("@"*10)
-                info = None
+                info = {
+                    "node_name": None,
+                    "var_name": None,
+                    "value": None,
+                    "failure": "mismatch"
+                }
             
             sentence_info_list.append(info)
         
@@ -80,9 +89,9 @@ class RewardModel:
         for i in range(len(sentence_info_list)):
             info = sentence_info_list[i]
             
-            if info is None: 
+            if "mismatch" in info.values(): 
                 # This step is redundant
-                reward_list[i] = self.config["redundant_step_reward"]
+                reward_list[i] = self.config["mismatch_step_reward"]
                 continue
             
             elif not info["node_name"] in self.Gd_topo_node.keys():
