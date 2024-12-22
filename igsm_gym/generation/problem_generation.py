@@ -3,7 +3,7 @@ import random
 import json
 import numpy as np
 
-from igsm_gym.utils import softmax
+from igsm_gym.utils import softmax, random_select_and_remove, english_dict
 from igsm_gym.generation.graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
 
 DEFAULT_CONFIG = {
@@ -40,14 +40,19 @@ class ProblemGenerator:
             ]
             self.category_name = ["WWW", "XXX", "YYY", "ZZZ"]
         else:
-            with open(self.config["english_path"], 'r') as f:
-                all_data = json.load(f)
-            system = all_data.get(random.choice(list(all_data.keys())))
+            # with open(self.config["english_path"], 'r') as f:
+            #     all_data = json.load(f)
+            all_data = english_dict
+            ecosystem_name = random.choice(list(all_data.keys()))
+            print(f"Using ecosystem: {ecosystem_name}")
+            system = all_data.get(ecosystem_name)
             self.category_name = list(system.keys())
             
             self.name_dictionary = []
             for sub_category in system.values():
-                self.name_dictionary.append(sub_category.get(random.choice(list(sub_category.keys()))))
+                sub_category_name = random.choice(list(sub_category.keys()))
+                print(f"Using sub-category: {sub_category_name}")
+                self.name_dictionary.append(sub_category.get(sub_category_name))
 
             self.category_name.reverse()
             self.name_dictionary.reverse()
@@ -78,6 +83,8 @@ class ProblemGenerator:
         _t0, _t1 = [random.randint((num_layers - 1) * w0, max_ip) for _ in range(2)]
         num_edges = min(_t0, _t1, (num_layers - 1) * w1 * w1)
 
+        print(f"num_layers: {num_layers}, w0: {w0}, w1: {w1}, num_edges: {num_edges}")
+
         return w0, w1, num_layers, num_edges
 
 
@@ -104,6 +111,8 @@ class ProblemGenerator:
         self.category_name = self.category_name[_start_layer:_start_layer+num_layers]
 
         # print(f"num_layers: {num_layers}, w0: {w0}, w1: {w1}, num_edges: {num_edges}")
+        print(f"Random state (random): {random.randint(0, 100000)}")
+        print(f"NP Random state (random): {np.random.randint(0, 100000)}")
 
         flag = False
         _cnt = 0
@@ -132,9 +141,12 @@ class ProblemGenerator:
 
     def generate_question(self) -> str:
         question_desc = []
+        print(f"Random state (random): {random.randint(0, 100000)}")
+        print(f"NP Random state (random): {np.random.randint(0, 100000)}")
         for node in self.Gd.topo:
             if node.node_type == "instance":
                 question_desc.append(self.Gd.gen_sentence(node))
+
         random.shuffle(question_desc)
         question_desc.append(self.Gd.gen_question(node))
         final_question = ". ".join(question_desc)
@@ -142,14 +154,13 @@ class ProblemGenerator:
     
     def generate_answer(self) -> str:
         answer_desc = []
-        all_variables = set(
-            [chr(i) for i in range(ord('a'), ord('z') + 1)] + # lower case
-            [chr(i) for i in range(ord('A'), ord('Z') + 1)] # upper case
-        )
+        all_variables = [chr(i) for i in range(ord('a'), ord('z') + 1)] # lower case
+        all_variables.extend([chr(i) for i in range(ord('A'), ord('Z') + 1)]) # upper case
+
         for node in self.Gd.topo:
             if not all_variables:
                 raise RuntimeError("No enough variable names for answer.")
-            _var_name = all_variables.pop()
+            _var_name = random_select_and_remove(all_variables)
             answer_desc.append(self.Gd.gen_answer(node, _var_name))
         final_ans_statement = "Thus, the answer is {}.".format(node.value)
         answer_desc.append(final_ans_statement)
@@ -159,8 +170,8 @@ class ProblemGenerator:
 
 
 if __name__ == "__main__":
-    seed = random.randint(0, 100000)
-    # seed = 2927
+    # seed = random.randint(0, 100000)
+    seed = 489
     random.seed(seed)
     np.random.seed(seed)
     print(f"Seed: {seed}")

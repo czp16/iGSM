@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple, Dict, Any, Literal
 from collections import deque
 import random
 import numpy as np
-from igsm_gym.utils.misc import softmax
+from igsm_gym.utils.misc import softmax, random_select_and_remove
 
 class Node:
     """
@@ -170,8 +170,6 @@ class StructureGraph:
         Algorithm 1 in the paper. Randomly draw the structure of the graph.
         """
         w0, w1, num_layers, num_edges = self.w0, self.w1, self.num_layers, self.num_edges
-        
-        max_attempts = 10
 
         # 1. Randomly generate the number of items per layer
         
@@ -444,10 +442,10 @@ class DependencyGraph:
 
         Randomly select instance parameters until the number of operations reaches `max_op_stage2`.
         """
-        remaining_instance_params = set([p for p in self.Gs.params if p.param_type == "instance" and p not in self.param2depnode])
+        remaining_instance_params = [p for p in self.Gs.params if p.param_type == "instance" and p not in self.param2depnode]
         while self.num_op < self.max_op_stage2 and remaining_instance_params:
-            # randomly pop a parameter from the remaining_instance_params
-            selected_param = remaining_instance_params.pop()
+            # randomly remove a parameter from the remaining_instance_params
+            selected_param: Parameter = random_select_and_remove(remaining_instance_params)
             self.param2depnode[selected_param] = DependencyNode(
                 # though they should have no parents at this stage
                 parent_nodes=[self.param2depnode[p] for p in selected_param.parent_nodes],
@@ -486,9 +484,9 @@ class DependencyGraph:
         
         while True:
             if not topo:
-                node = group2.pop()
+                node = random.choice(list(group2))
             else:
-                node = (group1 & group2).pop()
+                node = random.choice(list(group1 & group2))
             topo.append(node)
             remaining_nodes.discard(node)
             group1.discard(node)
@@ -587,8 +585,8 @@ class DependencyGraph:
         remaining instance parameters to the graph. Meanwhile, we may add unnecessary
         abstract parameters.
         """
-        remaining_instance_params = set([p for p in self.Gs.params if p.param_type == "instance" and p not in self.param2depnode])
-        remaining_abstract_params = set([p for p in self.Gs.params if p.param_type == "abstract" and p not in self.param2depnode])
+        remaining_instance_params = [p for p in self.Gs.params if p.param_type == "instance" and p not in self.param2depnode]
+        remaining_abstract_params = [p for p in self.Gs.params if p.param_type == "abstract" and p not in self.param2depnode]
 
         unnecessary_nodes = [] # unnecessary instance parameters
         while remaining_instance_params:
@@ -596,11 +594,11 @@ class DependencyGraph:
             computable_params: List[DependencyNode | Parameter] = self.depnodes[:] 
             # select computable abstract parameter from the `remaining_abstract_params`
             # they are Parameter instead of DependencyNode; will create DependencyNodes for them when added to the graph
-            for p in list(remaining_abstract_params):
+            for p in remaining_abstract_params:
                 if all([p_parent in self.param2depnode for p_parent in p.parent_nodes]):
                     computable_params.append(p)
             
-            param_a = remaining_instance_params.pop()
+            param_a = random_select_and_remove(remaining_instance_params)
             node_a = DependencyNode(
                 # though it should have no parents at this stage
                 parent_nodes=[self.param2depnode[p] for p in param_a.parent_nodes],
@@ -659,14 +657,22 @@ class DependencyGraph:
         parents = node.parent_nodes
         has_rng = self.rng in parents
 
+        _suffix = ""
+
         if has_rng:
             random_int = random.randint(0, self.mod - 1)
             desc += " " + str(random_int)
             _equation += str(random_int)
             parents.remove(self.rng) # will add it back later
             if parents:
-                desc += random.choice([" more than", " times"])
-                _equation += random.choice([" + ", " * "])
+                _op = random.choice([" + ", " * "])
+                _op_str = " more than" if _op == " + " else " times"
+                desc += _op_str
+                _equation += _op
+                if len(parents) > 1:
+                    _equation += "("
+                    _suffix = ")"
+                    
         if len(parents) == 1:
             desc += f" {parents[0].name}"
             _equation += "{0}"
@@ -679,8 +685,9 @@ class DependencyGraph:
         elif len(parents) > 2:
             random.shuffle(parents)
             desc += " the sum of " + ", ".join([p.name for p in parents[:-1]]) + f" and {parents[-1].name}"
-            _equation += "(" + " + ".join([f"{{{i}}}" for i in range(len(parents))]) + ")"
+            _equation += " + ".join([f"{{{i}}}" for i in range(len(parents))])
 
+        _equation += _suffix
         node.eval_equation = _equation
         if has_rng:
             parents.append(self.rng)
