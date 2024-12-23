@@ -162,15 +162,10 @@ class StructureGraph:
         self.layer_category_name = layer_category_name
 
         self.draw_structure()
-        self.name_nodes(name_dictionary) # Modify self.nodes
-        print(f"self.nodes: {self.nodes}")
-        print(f"self.nodes[0] name: {[node.name for node in self.nodes[0]]}")
-        print(f"self.nodes[1] name: {[node.name for node in self.nodes[1]]}")
-        print(f"self.nodes[2] name: {[node.name for node in self.nodes[2]]}")
-        # print("GS name_dictionary:", name_dictionary)
+        self.name_nodes(name_dictionary)
 
         self.construct_param_dependency_graph()
-        print(f"self.params[0]: {self.params[0]}")
+        
 
     def draw_structure(self):
         """
@@ -245,7 +240,6 @@ class StructureGraph:
         self.params.extend(self.get_all_abstract_param())
         
         index2param = {param.index: param for param in self.params}
-        print(f"index2param.keys(): {index2param.keys()}")
 
         # add the dependency parameters to each abstract parameter
         for param in self.params:
@@ -272,11 +266,6 @@ class StructureGraph:
                         param.parent_nodes.append(index2param[(li, parent.index)]) # abstract parameter
                 else:
                     raise ValueError(f"Invalid parameter index: {param.index}")
-        
-        # print("parent node:")
-        # for param in self.params:
-        #     if param.param_type == "abstract":
-        #         print(param.parent_nodes)
 
         
     
@@ -366,9 +355,6 @@ class DependencyGraph:
         self.construct_Gd1()
         self.construct_Gd2()
         self.depnodes = list(self.param2depnode.values()) # correct
-        # print("*"*10)
-        # print([node.name for node in self.depnodes])
-        # print("*"*10)
 
         if not self.construct_Gd3():
             print("Failed to construct Gd3")
@@ -497,12 +483,13 @@ class DependencyGraph:
         topo = self.topo
         group1 = list() # Set introduces randomness
         group2 = list([node for node in remaining_nodes if out_degree_map[node] == 0]) # Set introduces randomness
+        random.shuffle(group2)
         
         while True:
             if not topo:
                 node = random.choice(list(group2))
             else:
-                node = random.choice(list(set(group1) & set(group2))) 
+                node = random.choice([elem for elem in group1 if elem in group2]) 
             topo.append(node)
             if node in remaining_nodes:
                 remaining_nodes.remove(node)

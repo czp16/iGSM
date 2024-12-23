@@ -107,8 +107,7 @@ class ProblemGenerator:
         _start_layer = random.randint(0, self.config["max_structure_layers"] - num_layers)
         self.name_dictionary = self.name_dictionary[_start_layer:_start_layer+num_layers]
         self.category_name = self.category_name[_start_layer:_start_layer+num_layers]
-
-        # print(f"num_layers: {num_layers}, w0: {w0}, w1: {w1}, num_edges: {num_edges}")
+        
 
         flag = False
         _cnt = 0
@@ -116,6 +115,7 @@ class ProblemGenerator:
             _cnt += 1
             if _cnt > self.config["max_attempts"]: 
                 # will retry if stage 3 failed until max_attempts
+                print("False: _cnt > self.config[\"max_attempts\"]")
                 return False
 
             # Generate the structure graph
