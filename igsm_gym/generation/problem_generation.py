@@ -1,9 +1,10 @@
 from typing import Dict, List, Tuple, Optional
 import random
+import os
 import json
 import numpy as np
 
-from igsm_gym.utils import softmax, seed_all
+from igsm_gym.utils import softmax, seed_all, random_select_and_remove, english_dict
 from igsm_gym.generation.graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
 
 DEFAULT_CONFIG = {
@@ -41,14 +42,17 @@ class ProblemGenerator:
             ]
             self.category_name = ["WWW", "XXX", "YYY", "ZZZ"]
         else:
-            with open(self.config["english_path"], 'r') as f:
-                all_data = json.load(f)
-            system = all_data.get(random.choice(list(all_data.keys())))
+            # with open(self.config["english_path"], 'r') as f:
+            #     all_data = json.load(f)
+            all_data = english_dict
+            ecosystem_name = random.choice(list(all_data.keys()))
+            system = all_data.get(ecosystem_name)
             self.category_name = list(system.keys())
             
             self.name_dictionary = []
             for sub_category in system.values():
-                self.name_dictionary.append(sub_category.get(random.choice(list(sub_category.keys()))))
+                sub_category_name = random.choice(list(sub_category.keys()))
+                self.name_dictionary.append(sub_category.get(sub_category_name))
 
             self.category_name.reverse()
             self.name_dictionary.reverse()
@@ -136,6 +140,7 @@ class ProblemGenerator:
         for node in self.Gd.topo:
             if node.node_type == "instance":
                 question_desc.append(self.Gd.gen_sentence(node))
+
         random.shuffle(question_desc)
         question_desc.append(self.Gd.gen_question(node))
         final_question = ". ".join(question_desc)
@@ -143,20 +148,13 @@ class ProblemGenerator:
     
     def generate_answer(self) -> str:
         answer_desc = []
-        all_variables = list(
-            [chr(i) for i in range(ord('a'), ord('z') + 1)] + # lower case
-            [chr(i) for i in range(ord('A'), ord('Z') + 1)] # upper case
-        )
-        all_variables = sorted(all_variables)
-        # seed_all(2900)
-        print("random int:", random.randint(0, 100))
-        random.shuffle(all_variables)
-        print("all_variables:", all_variables)
+        all_variables = [chr(i) for i in range(ord('a'), ord('z') + 1)] # lower case
+        all_variables.extend([chr(i) for i in range(ord('A'), ord('Z') + 1)]) # upper case
+
         for node in self.Gd.topo:
             if not all_variables:
                 raise RuntimeError("No enough variable names for answer.")
-            _var_name = all_variables.pop()
-            print("varname:", _var_name)
+            _var_name = random_select_and_remove(all_variables)
             answer_desc.append(self.Gd.gen_answer(node, _var_name))
         final_ans_statement = "Thus, the answer is {}.".format(node.value)
         answer_desc.append(final_ans_statement)
@@ -167,9 +165,10 @@ class ProblemGenerator:
 
 if __name__ == "__main__":
     # seed = random.randint(0, 100000)
-    seed = 2900
-    # random.seed(seed)
-    # np.random.seed(seed)
+    seed = 32489
+    random.seed(seed)
+    # os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
     print(f"Seed: {seed}")
     seed_all(seed)
 

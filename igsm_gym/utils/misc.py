@@ -1,5 +1,6 @@
-from typing import List, Dict, Optional, Sequence
+from typing import List, Optional, Dict, Optional, Sequence
 import numpy as np
+import random
 import random
 import torch
 import os
@@ -31,3 +32,10 @@ def seed_all(seed=1029, others: Optional[list] = None):
                     item.seed(seed)
         except:
             pass
+
+def random_select_and_remove(lst: List):
+    if not lst:
+        return None
+    index = random.randrange(len(lst))
+    lst[index], lst[-1] = lst[-1], lst[index]
+    return lst.pop()
