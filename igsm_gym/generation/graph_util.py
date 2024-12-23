@@ -5,7 +5,8 @@ from typing import List, Optional, Tuple, Dict, Any, Literal
 from collections import deque
 import random
 import numpy as np
-from igsm_gym.utils.misc import softmax, random_select_and_remove
+from igsm_gym.utils.misc import softmax, random_select_and_remove, seed_all
+
 
 class Node:
     """
@@ -161,9 +162,15 @@ class StructureGraph:
         self.layer_category_name = layer_category_name
 
         self.draw_structure()
-        self.name_nodes(name_dictionary)
+        self.name_nodes(name_dictionary) # Modify self.nodes
+        print(f"self.nodes: {self.nodes}")
+        print(f"self.nodes[0] name: {[node.name for node in self.nodes[0]]}")
+        print(f"self.nodes[1] name: {[node.name for node in self.nodes[1]]}")
+        print(f"self.nodes[2] name: {[node.name for node in self.nodes[2]]}")
+        # print("GS name_dictionary:", name_dictionary)
 
         self.construct_param_dependency_graph()
+        print(f"self.params[0]: {self.params[0]}")
 
     def draw_structure(self):
         """
@@ -238,6 +245,7 @@ class StructureGraph:
         self.params.extend(self.get_all_abstract_param())
         
         index2param = {param.index: param for param in self.params}
+        print(f"index2param.keys(): {index2param.keys()}")
 
         # add the dependency parameters to each abstract parameter
         for param in self.params:
@@ -264,6 +272,11 @@ class StructureGraph:
                         param.parent_nodes.append(index2param[(li, parent.index)]) # abstract parameter
                 else:
                     raise ValueError(f"Invalid parameter index: {param.index}")
+        
+        # print("parent node:")
+        # for param in self.params:
+        #     if param.param_type == "abstract":
+        #         print(param.parent_nodes)
 
         
     
@@ -352,13 +365,16 @@ class DependencyGraph:
         # We will get all DependencyNodes in first 2 stages.
         self.construct_Gd1()
         self.construct_Gd2()
-        self.depnodes = list(self.param2depnode.values())
+        self.depnodes = list(self.param2depnode.values()) # correct
+        # print("*"*10)
+        # print([node.name for node in self.depnodes])
+        # print("*"*10)
 
         if not self.construct_Gd3():
-            # print("Failed to construct Gd3")
+            print("Failed to construct Gd3")
             return "stage 3 failed"
         if not self.construct_Gd4():
-            # print("Failed to construct Gd4")
+            print("Failed to construct Gd4")
             return "stage 4 failed"
         self.construct_Gd()
         return "success"
@@ -477,35 +493,39 @@ class DependencyGraph:
         # (first it is from leaves to roots, will be reversed later)
         # group1: the parent nodes of nodes in topo, corresponding to Next1_Gd in paper
         # group2: the nodes having no children in remaining_nodes (out_degree = 0) corresponding to Next2_Gd in paper
-        remaining_nodes = set(self.depnodes)
+        remaining_nodes = list(self.depnodes) # Set introduces randomness
         topo = self.topo
-        group1 = set()
-        group2 = set([node for node in remaining_nodes if out_degree_map[node] == 0])
+        group1 = list() # Set introduces randomness
+        group2 = list([node for node in remaining_nodes if out_degree_map[node] == 0]) # Set introduces randomness
         
         while True:
             if not topo:
                 node = random.choice(list(group2))
             else:
-                node = random.choice(list(group1 & group2))
+                node = random.choice(list(set(group1) & set(group2))) 
             topo.append(node)
-            remaining_nodes.discard(node)
-            group1.discard(node)
-            group2.discard(node)
+            if node in remaining_nodes:
+                remaining_nodes.remove(node)
+            if node in group1:
+                group1.remove(node)
+            if node in group2:
+                group2.remove(node)
             for p in node.parent_nodes:
-                group1.add(p)
+                group1.append(p)
                 out_degree_map[p] -= 1
                 if out_degree_map[p] == 0:
-                    group2.add(p)
+                    group2.append(p)
 
             if not remaining_nodes:
                 break
-            if not (group1 & group2):
+            if not any(elem in group2 for elem in group1):
                 if node.node_type == "abstract":
                     return False
                 # non-uniformly random select a parent node from group2
                 # weight of non-uniform random selection
                 group2_list = list(group2)
                 _g = abs(np.random.randn())
+                # print("_g:", _g)
                 _w = [int(node.node_type == "abstract") + int(node in group1) for node in group2_list]
                 _w = softmax(np.array(_w) * _g)
                 p_node = np.random.choice(group2_list, p=_w) # non-uniform random selection
@@ -514,7 +534,7 @@ class DependencyGraph:
                 # so p_node is still in group2; meanwhile p_node will be added to group1
                 # then p_node \in group1 \cap group2
                 node.parent_nodes.append(p_node)
-                group1.add(p_node)
+                group1.append(p_node)
                 
             elif node.node_type == "instance":
                 if random.random() < 0.5:
@@ -527,7 +547,7 @@ class DependencyGraph:
 
                     # and create an edge p_node -> node
                     node.parent_nodes.append(p_node)
-                    group1.add(p_node)
+                    group1.append(p_node)
 
         topo.reverse()
         return True
