@@ -115,7 +115,7 @@ class ProblemGenerator:
             _cnt += 1
             if _cnt > self.config["max_attempts"]: 
                 # will retry if stage 3 failed until max_attempts
-                print("False: _cnt > self.config[\"max_attempts\"]")
+                # print("False: _cnt > self.config[\"max_attempts\"]")
                 return False
 
             # Generate the structure graph

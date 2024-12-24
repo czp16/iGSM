@@ -13,9 +13,11 @@ Testing file is reward.ipynb
 
 REWARD_DEFAULT_CONFIG = {
     "correct_step_reward": 1.0,
-    "wrong_step_reward": 0.0,
+    "wrong_step_reward": -0.5,
     "redundant_step_reward": 0.1,
     "mismatch_step_reward": -0.1,
+    "mismatch_but_correct_reward": 0.5,
+    "format_error_reward": -1.0,
     "PRM": True,
 }
 
@@ -39,9 +41,18 @@ class RewardModel:
         # Calculate reward based on llm_output trajectory (one turn)
         
         sentence_list = llm_output.split('\n') # List["Define each Y9's X7 as b. So b = 9."]
+        # print("sentence_list: ", sentence_list)
+        
             
         final_answer = sentence_list.pop() # "Thus, the answer is ..."
-        final_answer_value = float(final_answer.split(' ')[-1]) 
+        # print("final_answer: ", final_answer)
+        
+        try:
+            final_answer_value = float(final_answer.split(' ')[-1]) 
+        except ValueError:
+            final_answer_value = -1 # invalid output
+        
+        
         
         sentence_info_list = []
         for sentence in sentence_list:
@@ -49,7 +60,7 @@ class RewardModel:
             template = sentence
             # Define the regular expression pattern
             
-            pattern = r"(?:Define each |Each )?(.+?) as (\w+)\. So \2 = (?:.*= )?(\d+)\." # r"Define (.+?) as (\w+)\. So \2 = .* = (\d+)\."
+            pattern = r"(?:Define each |Each )?(.+?) as (\w+)\. (?:So |so )?\2 = (?:.*= )?(\d+)\." # r"Define (.+?) as (\w+)\. So \2 = .* = (\d+)\."
             # Match the pattern in the string
             match = re.match(pattern, template)
             # print("pattern:")
@@ -115,8 +126,11 @@ class RewardModel:
         
         # Final step 
         gt_ans = self.Gd.topo[-1].value
+        # print("GT_final step:", gt_ans)
         if gt_ans == final_answer_value:
             reward_list.append(self.config["correct_step_reward"])
+        elif final_answer_value == -1:
+            reward_list.append(self.config["format_error_reward"])
         else:
             reward_list.append(self.config["wrong_step_reward"])
             
@@ -125,8 +139,6 @@ class RewardModel:
         #     print(sentence_info_list[i])
         #     print("reward:", reward_list[i])
         #     print("="*10)
-            
-            
 
         return reward_list
     

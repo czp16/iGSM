@@ -357,10 +357,10 @@ class DependencyGraph:
         self.depnodes = list(self.param2depnode.values()) # correct
 
         if not self.construct_Gd3():
-            print("Failed to construct Gd3")
+            # print("Failed to construct Gd3")
             return "stage 3 failed"
         if not self.construct_Gd4():
-            print("Failed to construct Gd4")
+            # print("Failed to construct Gd4")
             return "stage 4 failed"
         self.construct_Gd()
         return "success"
