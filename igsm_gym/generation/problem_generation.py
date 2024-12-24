@@ -18,14 +18,15 @@ DEFAULT_CONFIG = {
     "max_attempts": 50,
 
     "max_instance_params": 20,
-    "max_operations": 11,
-    "force": True, # force the operation num to be exactly `max_operations`
+    "max_operations": 21,
+    "force": False, # force the operation num to be exactly `max_operations`
 }
 
 
 class ProblemGenerator:
-    def __init__(self, config: Dict = {}, debug: bool = False, seed=0):
-        seed_all(seed=seed)
+    def __init__(self, config: Dict = {}, debug: bool = False, seed: Optional[int] = None):
+        if seed is not None:
+            seed_all(seed=seed)
         self.config = config
         self.debug = debug
         for k,v in DEFAULT_CONFIG.items():
@@ -115,7 +116,6 @@ class ProblemGenerator:
             _cnt += 1
             if _cnt > self.config["max_attempts"]: 
                 # will retry if stage 3 failed until max_attempts
-                # print("False: _cnt > self.config[\"max_attempts\"]")
                 return False
 
             # Generate the structure graph
@@ -165,12 +165,12 @@ class ProblemGenerator:
 
 if __name__ == "__main__":
     # seed = random.randint(0, 100000)
-    seed = 32489
+    seed = 118564
     random.seed(seed)
     # os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
     print(f"Seed: {seed}")
-    seed_all(seed)
+    # seed_all(seed)
 
     pg = ProblemGenerator(DEFAULT_CONFIG, debug=True, seed=seed)
     if pg.draw_question():
@@ -181,8 +181,8 @@ if __name__ == "__main__":
 
     # _cnt = 0
 
+    # pg = ProblemGenerator(DEFAULT_CONFIG)
     # for _ in range(100):
-    #     pg = ProblemGenerator(DEFAULT_CONFIG)
     #     if pg.draw_question():
     #         _cnt += 1
 

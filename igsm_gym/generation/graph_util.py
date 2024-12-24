@@ -479,17 +479,18 @@ class DependencyGraph:
         # (first it is from leaves to roots, will be reversed later)
         # group1: the parent nodes of nodes in topo, corresponding to Next1_Gd in paper
         # group2: the nodes having no children in remaining_nodes (out_degree = 0) corresponding to Next2_Gd in paper
-        remaining_nodes = list(self.depnodes) # Set introduces randomness
+        # IMPORTANT: we don't use data structure `set` here because the order cannot be guaranteed to be the same 
+        # given a fixed seed
+        remaining_nodes = self.depnodes[:]
         topo = self.topo
-        group1 = list() # Set introduces randomness
-        group2 = list([node for node in remaining_nodes if out_degree_map[node] == 0]) # Set introduces randomness
-        random.shuffle(group2)
+        group1 = []
+        group2 = [node for node in remaining_nodes if out_degree_map[node] == 0]
         
         while True:
             if not topo:
-                node = random.choice(list(group2))
+                node = random.choice(group2)
             else:
-                node = random.choice([elem for elem in group1 if elem in group2]) 
+                node = random.choice([node for node in group1 if node in group2]) # the intersection of group1 and group2
             topo.append(node)
             if node in remaining_nodes:
                 remaining_nodes.remove(node)
@@ -505,14 +506,13 @@ class DependencyGraph:
 
             if not remaining_nodes:
                 break
-            if not any(elem in group2 for elem in group1):
+            if not any(_node in group2 for _node in group1): # no intersection
                 if node.node_type == "abstract":
                     return False
                 # non-uniformly random select a parent node from group2
                 # weight of non-uniform random selection
                 group2_list = list(group2)
                 _g = abs(np.random.randn())
-                # print("_g:", _g)
                 _w = [int(node.node_type == "abstract") + int(node in group1) for node in group2_list]
                 _w = softmax(np.array(_w) * _g)
                 p_node = np.random.choice(group2_list, p=_w) # non-uniform random selection
@@ -526,11 +526,10 @@ class DependencyGraph:
             elif node.node_type == "instance":
                 if random.random() < 0.5:
                     # non-uniformly random select a parent node, same as above
-                    remaining_nodes_list = list(remaining_nodes)
                     _g = abs(np.random.randn())
-                    _w = [int(node.node_type == "abstract") + int(node in group1) for node in remaining_nodes_list]
+                    _w = [int(node.node_type == "abstract") + int(node in group1) for node in remaining_nodes]
                     _w = softmax(np.array(_w) * _g)
-                    p_node = np.random.choice(remaining_nodes_list, p=_w) # non-uniform random selection
+                    p_node = np.random.choice(remaining_nodes, p=_w) # non-uniform random selection
 
                     # and create an edge p_node -> node
                     node.parent_nodes.append(p_node)
