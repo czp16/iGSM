@@ -25,13 +25,16 @@ DEFAULT_CONFIG = {
 
 class ProblemGenerator:
     def __init__(self, config: Dict = {}, debug: bool = False, seed: Optional[int] = None):
-        if seed is not None:
-            seed_all(seed=seed)
+        self.seed(seed)
         self.config = config
         self.debug = debug
         for k,v in DEFAULT_CONFIG.items():
             if k not in self.config:
                 self.config[k] = v
+
+    def seed(self, seed: Optional[int] = None):
+        if seed is not None:
+            seed_all(seed=seed)
 
     def _load_name_dictionary(self):
         if self.debug:
