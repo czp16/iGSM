@@ -13,7 +13,7 @@ DEFAULT_ENV_CONFIG = {
 
     "prompt_template": \
 """<|system|>
-You're an expert at solving elementary math problems involving addition, subtraction, and multiplication. You solve all the problems in a uniform format. All calculations are done modulo 23</s>
+You're an expert at solving elementary math problems involving addition, subtraction, and multiplication. You solve all the problems in a uniform format. All calculations are done modulo 23.</s>
 <|user|>
 {query}</s>
 <|assistant|>
@@ -21,12 +21,11 @@ You're an expert at solving elementary math problems involving addition, subtrac
 }
 
 DEFAULT_REWARD_CONFIG = {
-    "correct_step_reward": 1.0,
-    "wrong_step_reward": -0.5,
-    "redundant_step_reward": 0.1,
-    "mismatch_step_reward": -0.1,
-    "mismatch_but_correct_reward": 0.5,
-    "format_error_reward": -1.0,
+    "PRM/correct_step": 1.0,
+    "PRM/wrong_calculation": 0.5,
+    "PRM/wrong_step": -0.5,
+    "PRM/redundant_step": -0.5,
+    "PRM/mismatch_step": -1.0,
     "PRM": True,
 
     "ORM/correct_answer": 1.0,
