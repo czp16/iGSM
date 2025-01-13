@@ -5,11 +5,8 @@ import datasets
 
 from igsm_gym.generation import ProblemGenerator
 
-
-
-
 config = {
-    "english_path": "igsm_gym/generation/english/categorization.json",
+    # "english_path": "igsm_gym/generation/english/categorization.json",
     "max_operations": 21,
     "force": False,
 }

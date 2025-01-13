@@ -8,7 +8,7 @@ from igsm_gym.utils import softmax, seed_all, random_select_and_remove, english_
 from igsm_gym.generation.graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
 
 DEFAULT_CONFIG = {
-    "english_path": "igsm_gym/generation/english/categorization.json",
+    # "english_path": "igsm_gym/generation/english/categorization.json",
 
     "max_structure_layers": 4,
     "min_items_per_layer": 2,
