@@ -1,5 +1,5 @@
 exp/
-# data/
+data/
 wandb/
 log_data/
 baselines/
