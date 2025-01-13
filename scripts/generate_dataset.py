@@ -14,7 +14,7 @@ config = {
     "force": False,
 }
 
-dataset_size = 50000
+dataset_size = 10
 save_path = f"data/iGSM_train_maxop_{config['max_operations']}"
 seed = 42
 random.seed(seed)

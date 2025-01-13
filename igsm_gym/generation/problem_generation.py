@@ -4,11 +4,11 @@ import os
 import json
 import numpy as np
 
-from igsm_gym.utils import softmax, random_select_and_remove, english_dict
+from igsm_gym.utils import softmax, seed_all, random_select_and_remove, english_dict
 from igsm_gym.generation.graph_util import Node, StructureGraph, DependencyNode, DependencyGraph
 
 DEFAULT_CONFIG = {
-    "english_path": "english/categorization.json",
+    "english_path": "igsm_gym/generation/english/categorization.json",
 
     "max_structure_layers": 4,
     "min_items_per_layer": 2,
@@ -18,18 +18,23 @@ DEFAULT_CONFIG = {
     "max_attempts": 50,
 
     "max_instance_params": 20,
-    "max_operations": 11,
-    "force": True, # force the operation num to be exactly `max_operations`
+    "max_operations": 21,
+    "force": False, # force the operation num to be exactly `max_operations`
 }
 
 
 class ProblemGenerator:
-    def __init__(self, config: Dict = {}, debug: bool = False):
+    def __init__(self, config: Dict = {}, debug: bool = False, seed: Optional[int] = None):
+        self.seed(seed)
         self.config = config
         self.debug = debug
         for k,v in DEFAULT_CONFIG.items():
             if k not in self.config:
                 self.config[k] = v
+
+    def seed(self, seed: Optional[int] = None):
+        if seed is not None:
+            seed_all(seed=seed)
 
     def _load_name_dictionary(self):
         if self.debug:
@@ -106,8 +111,7 @@ class ProblemGenerator:
         _start_layer = random.randint(0, self.config["max_structure_layers"] - num_layers)
         self.name_dictionary = self.name_dictionary[_start_layer:_start_layer+num_layers]
         self.category_name = self.category_name[_start_layer:_start_layer+num_layers]
-
-        # print(f"num_layers: {num_layers}, w0: {w0}, w1: {w1}, num_edges: {num_edges}")
+        
 
         flag = False
         _cnt = 0
@@ -164,13 +168,14 @@ class ProblemGenerator:
 
 if __name__ == "__main__":
     # seed = random.randint(0, 100000)
-    seed = 32489
+    seed = 118564
     random.seed(seed)
     # os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
     print(f"Seed: {seed}")
+    # seed_all(seed)
 
-    pg = ProblemGenerator(DEFAULT_CONFIG)
+    pg = ProblemGenerator(DEFAULT_CONFIG, debug=True, seed=seed)
     if pg.draw_question():
         print(pg.generate_question())
         print(pg.generate_answer())
@@ -179,8 +184,8 @@ if __name__ == "__main__":
 
     # _cnt = 0
 
+    # pg = ProblemGenerator(DEFAULT_CONFIG)
     # for _ in range(100):
-    #     pg = ProblemGenerator(DEFAULT_CONFIG)
     #     if pg.draw_question():
     #         _cnt += 1
 

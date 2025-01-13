@@ -5,7 +5,8 @@ from typing import List, Optional, Tuple, Dict, Any, Literal
 from collections import deque
 import random
 import numpy as np
-from igsm_gym.utils.misc import softmax, random_select_and_remove
+from igsm_gym.utils.misc import softmax, random_select_and_remove, seed_all
+
 
 class Node:
     """
@@ -164,6 +165,7 @@ class StructureGraph:
         self.name_nodes(name_dictionary)
 
         self.construct_param_dependency_graph()
+        
 
     def draw_structure(self):
         """
@@ -352,7 +354,7 @@ class DependencyGraph:
         # We will get all DependencyNodes in first 2 stages.
         self.construct_Gd1()
         self.construct_Gd2()
-        self.depnodes = list(self.param2depnode.values())
+        self.depnodes = list(self.param2depnode.values()) # correct
 
         if not self.construct_Gd3():
             # print("Failed to construct Gd3")
@@ -477,29 +479,34 @@ class DependencyGraph:
         # (first it is from leaves to roots, will be reversed later)
         # group1: the parent nodes of nodes in topo, corresponding to Next1_Gd in paper
         # group2: the nodes having no children in remaining_nodes (out_degree = 0) corresponding to Next2_Gd in paper
-        remaining_nodes = set(self.depnodes)
+        # IMPORTANT: we don't use data structure `set` here because the order cannot be guaranteed to be the same 
+        # given a fixed seed
+        remaining_nodes = self.depnodes[:]
         topo = self.topo
-        group1 = set()
-        group2 = set([node for node in remaining_nodes if out_degree_map[node] == 0])
+        group1 = []
+        group2 = [node for node in remaining_nodes if out_degree_map[node] == 0]
         
         while True:
             if not topo:
-                node = random.choice(list(group2))
+                node = random.choice(group2)
             else:
-                node = random.choice(list(group1 & group2))
+                node = random.choice([node for node in group1 if node in group2]) # the intersection of group1 and group2
             topo.append(node)
-            remaining_nodes.discard(node)
-            group1.discard(node)
-            group2.discard(node)
+            if node in remaining_nodes:
+                remaining_nodes.remove(node)
+            if node in group1:
+                group1.remove(node)
+            if node in group2:
+                group2.remove(node)
             for p in node.parent_nodes:
-                group1.add(p)
+                group1.append(p)
                 out_degree_map[p] -= 1
                 if out_degree_map[p] == 0:
-                    group2.add(p)
+                    group2.append(p)
 
             if not remaining_nodes:
                 break
-            if not (group1 & group2):
+            if not any(_node in group2 for _node in group1): # no intersection
                 if node.node_type == "abstract":
                     return False
                 # non-uniformly random select a parent node from group2
@@ -514,20 +521,19 @@ class DependencyGraph:
                 # so p_node is still in group2; meanwhile p_node will be added to group1
                 # then p_node \in group1 \cap group2
                 node.parent_nodes.append(p_node)
-                group1.add(p_node)
+                group1.append(p_node)
                 
             elif node.node_type == "instance":
                 if random.random() < 0.5:
                     # non-uniformly random select a parent node, same as above
-                    remaining_nodes_list = list(remaining_nodes)
                     _g = abs(np.random.randn())
-                    _w = [int(node.node_type == "abstract") + int(node in group1) for node in remaining_nodes_list]
+                    _w = [int(node.node_type == "abstract") + int(node in group1) for node in remaining_nodes]
                     _w = softmax(np.array(_w) * _g)
-                    p_node = np.random.choice(remaining_nodes_list, p=_w) # non-uniform random selection
+                    p_node = np.random.choice(remaining_nodes, p=_w) # non-uniform random selection
 
                     # and create an edge p_node -> node
                     node.parent_nodes.append(p_node)
-                    group1.add(p_node)
+                    group1.append(p_node)
 
         topo.reverse()
         return True
