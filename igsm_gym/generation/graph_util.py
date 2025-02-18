@@ -316,7 +316,7 @@ class DependencyGraph:
         max_op_stage2: int,
         final_num_op: int,
         max_instance_in_degree: int = 4,
-        mod = 23,
+        mod: int = 23,
     ):
         """
         Parameters:
@@ -709,7 +709,7 @@ class DependencyGraph:
         desc = f"How many {arg1} does {arg0} have?"
         return desc
 
-    def gen_answer(self, node: DependencyNode, variable_name: str) -> str:
+    def gen_answer(self, node: DependencyNode, variable_name: str, do_mod: bool) -> str:
         """
         Generate the answer for the DependencyNode.
 
@@ -727,7 +727,9 @@ class DependencyGraph:
         # only plug in the val of parent nodes, e.g., 5 + 3 (suppose b = 5)
         eval_equation2 = node.eval_equation.format(*[p.value for p in parents]) 
         # final val of the node
-        node.value = eval(eval_equation2) % self.mod
+        node.value = eval(eval_equation2) 
+        if do_mod:
+            node.value = node.value % self.mod
 
         # print(f"node {node.name}: var_name: {node.var_name}, eval_eq: {node.eval_equation}, parents: {[p.name for p in node.parent_nodes]}, value: {node.value}")
 

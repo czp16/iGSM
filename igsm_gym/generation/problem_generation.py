@@ -14,12 +14,13 @@ DEFAULT_CONFIG = {
     "min_items_per_layer": 2,
     "max_items_per_layer": 4,
     "max_instance_in_degree": 4,
-    "arithmetic_mod": 23,
+    "arithmetic_mod": 11,
     "max_attempts": 50,
 
     "max_instance_params": 20,
     "max_operations": 21,
     "force": False, # force the operation num to be exactly `max_operations`
+    "calculate_mod": False, # whether to calculate the mod value
 }
 
 
@@ -158,7 +159,7 @@ class ProblemGenerator:
             if not all_variables:
                 raise RuntimeError("No enough variable names for answer.")
             _var_name = random_select_and_remove(all_variables)
-            answer_desc.append(self.Gd.gen_answer(node, _var_name))
+            answer_desc.append(self.Gd.gen_answer(node, _var_name, do_mod=self.config["calculate_mod"]))
         final_ans_statement = "Thus, the answer is {}.".format(node.value)
         answer_desc.append(final_ans_statement)
         
@@ -168,19 +169,20 @@ class ProblemGenerator:
 
 if __name__ == "__main__":
     # seed = random.randint(0, 100000)
-    seed = 118564
-    random.seed(seed)
+    # seed = 1000
+    # random.seed(seed)
     # os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    print(f"Seed: {seed}")
+    # np.random.seed(seed)
+    # print(f"Seed: {seed}")
     # seed_all(seed)
 
-    pg = ProblemGenerator(DEFAULT_CONFIG, debug=True, seed=seed)
-    if pg.draw_question():
-        print(pg.generate_question())
-        print(pg.generate_answer())
-    else:
-        print("Failed to generate the question.")
+    pg = ProblemGenerator(DEFAULT_CONFIG, debug=True)
+    while not pg.draw_question():
+        continue
+    print(pg.generate_question())
+    print(pg.generate_answer())
+    # else:
+    #     print("Failed to generate the question.")
 
     # _cnt = 0
 
